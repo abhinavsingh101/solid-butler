@@ -1,0 +1,160 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  displayName String
+  passwordHash String
+  createdAt   DateTime @default(now())
+
+  assignedChores     ChoreAssignment[] @relation("AssignedTo")
+  choreHistory       ChoreHistory[]
+  createdSituations  SpecialSituation[]
+  situationItems     SituationItem[]
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ChoreCategory {
+  CLEANING
+  COOKING
+  LAUNDRY
+  MAINTENANCE
+  SHOPPING
+  OTHER
+}
+
+enum FrequencyType {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  AS_NEEDED
+}
+
+model Chore {
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  category       ChoreCategory @default(OTHER)
+  priority       Priority      @default(MEDIUM)
+  frequencyType  FrequencyType @default(WEEKLY)
+  frequencyValue Int           @default(1) // e.g. every N weeks
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  assignments ChoreAssignment[]
+  history     ChoreHistory[]
+}
+
+enum AssignmentStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+model ChoreAssignment {
+  id              String           @id @default(cuid())
+  choreId         String
+  assignedToId    String
+  dueDate         DateTime
+  status          AssignmentStatus @default(PENDING)
+  notes           String?
+  createdAt       DateTime         @default(now())
+  completedAt     DateTime?
+
+  chore      Chore @relation(fields: [choreId], references: [id])
+  assignedTo User  @relation("AssignedTo", fields: [assignedToId], references: [id])
+}
+
+enum HistoryAction {
+  ASSIGNED
+  COMPLETED
+  SKIPPED
+  REASSIGNED
+}
+
+// Append-only. Never delete rows from this table.
+// This is the LLM's memory for learning household patterns.
+model ChoreHistory {
+  id        String        @id @default(cuid())
+  choreId   String
+  userId    String
+  action    HistoryAction
+  notes     String?
+  timestamp DateTime      @default(now())
+
+  chore Chore @relation(fields: [choreId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+}
+
+enum SituationStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model SpecialSituation {
+  id              String          @id @default(cuid())
+  title           String
+  rawInput        String          // The free-text the user typed
+  eventDate       DateTime?
+  status          SituationStatus @default(ACTIVE)
+  createdAt       DateTime        @default(now())
+  createdById     String
+
+  createdBy User            @relation(fields: [createdById], references: [id])
+  items     SituationItem[]
+}
+
+enum ItemStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+model SituationItem {
+  id           String    @id @default(cuid())
+  situationId  String
+  title        String
+  description  String?
+  assignedToId String?
+  dueDate      DateTime?
+  status       ItemStatus @default(PENDING)
+  displayOrder Int        @default(0)
+  createdAt    DateTime   @default(now())
+  completedAt  DateTime?
+
+  situation  SpecialSituation @relation(fields: [situationId], references: [id])
+  assignedTo User?            @relation(fields: [assignedToId], references: [id])
+}
+
+enum MemoryContextType {
+  HOUSEHOLD_PREFERENCES
+  CHORE_PATTERNS
+  SITUATION_HISTORY
+}
+
+// Condensed context for Claude. Updated periodically to stay within token limits.
+model LlmMemory {
+  id          String            @id @default(cuid())
+  contextType MemoryContextType @unique
+  summary     String            // What Claude receives as context
+  rawData     Json?             // Supporting data for re-summarization
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
