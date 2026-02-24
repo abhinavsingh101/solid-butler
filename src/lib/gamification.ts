@@ -123,7 +123,7 @@ export function calculateCompletionPoints(params: {
   }
 }
 
-function computeNextStreak(currentStreak: number, lastCompletionDate: Date | null, nextCompletionDate: Date): number {
+export function computeNextStreak(currentStreak: number, lastCompletionDate: Date | null, nextCompletionDate: Date): number {
   if (!lastCompletionDate) return 1
 
   const lastDay = utcStartOfDay(lastCompletionDate)

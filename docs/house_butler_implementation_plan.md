@@ -185,6 +185,10 @@ Rules:
 - Unit tests for recurrence calculation, streak logic, and auth helpers.
 - Integration tests for auth + core API flows.
 - End-to-end happy path: login -> assign chore -> complete chore -> points/streak update.
+- Current implementation checkpoint:
+  - Vitest configured with shared test environment bootstrap (`tests/setup/env.ts`).
+  - Unit tests implemented for recurrence, streak computation, and JWT auth helpers.
+  - Integration fixture harness added for DB-backed API tests with deterministic cleanup.
 
 ### Manual checks (release checklist)
 - Add to Home Screen works on iOS and Android.
