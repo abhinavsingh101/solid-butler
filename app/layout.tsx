@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { PwaRegister } from '@/app/ui/pwa-register'
 import './globals.css'
 
 const geistSans = Geist({
@@ -15,12 +16,22 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'The House Butler',
   description: 'Household chore planning and intelligence for two members',
+  manifest: '/manifest.webmanifest',
+  themeColor: '#09090b',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'The House Butler',
+  },
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>{children}</body>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <PwaRegister />
+        {children}
+      </body>
     </html>
   )
 }

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="House Butler Icon">
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1f2937" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)" />
+  <path d="M112 250L256 130l144 120v132c0 10-8 18-18 18h-84V295h-84v105h-84c-10 0-18-8-18-18V250Z" fill="#f8fafc" />
+  <circle cx="256" cy="250" r="34" fill="#0f172a" />
+</svg>

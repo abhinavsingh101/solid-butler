@@ -253,4 +253,14 @@ Revisit rule:
 - Re-evaluate these defaults after 4-6 weeks of real household use.
 - If behavior is changed, record it in `docs/decision_log.md` as a new decision and mark older rows `SUPERSEDED`.
 
+## 16) PWA Installability Status (MVP)
+
+Implemented:
+- App manifest with standalone mobile install settings.
+- Service worker registration with minimal network-first fetch handling.
+- Mobile app icons declared in manifest.
+
+Deferred:
+- Advanced offline caching strategies.
+
 *Last updated: 2026-02-24*
