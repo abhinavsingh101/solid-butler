@@ -266,4 +266,26 @@ Implemented:
 Deferred:
 - Advanced offline caching strategies.
 
+## 17) Local Development Bootstrap
+
+This project is set up to run with a local PostgreSQL database by default.
+
+Environment rule:
+- `prisma.config.ts` loads `.env.local` first, then `.env`.
+- Local development should keep `DATABASE_URL` pointed to localhost.
+
+Expected local DB URL:
+- `postgresql://postgres:postgres@localhost:5432/housebutler?schema=public`
+
+Local bootstrap commands:
+1. `npx prisma generate`
+2. `npx prisma migrate dev --name init`
+3. `npm run db:seed`
+4. `npm run dev`
+
+Verification commands:
+- `npx prisma migrate status`
+- `npm run build`
+- `npx tsc --noEmit`
+
 *Last updated: 2026-02-24*
