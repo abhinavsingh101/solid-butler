@@ -47,6 +47,7 @@ MVP excludes:
 - Prisma ORM.
 - Prisma client runtime uses Postgres driver adapter (`@prisma/adapter-pg`) with `DATABASE_URL`.
 - Server-side Claude API access only.
+- Local development workflow defaults to `.env.local` for Prisma config and includes configured seed command.
 
 ### Runtime boundaries
 - UI pages and server route handlers live in app routes.
