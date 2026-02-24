@@ -189,6 +189,11 @@ Rules:
   - Vitest configured with shared test environment bootstrap (`tests/setup/env.ts`).
   - Unit tests implemented for recurrence, streak computation, and JWT auth helpers.
   - Integration fixture harness added for DB-backed API tests with deterministic cleanup.
+  - Integration coverage implemented for core MVP API flows:
+    - chores create/update/archive
+    - assignment completion gamification update + summary retrieval
+    - scheduler idempotency for recurring chores
+    - dashboard assignment payload shape (priority plan + busy days)
 
 ### Manual checks (release checklist)
 - Add to Home Screen works on iOS and Android.

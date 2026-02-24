@@ -1,5 +1,5 @@
 import { ChoreCategory, FrequencyType, Priority, type Chore, type User } from '@prisma/client'
-import { prisma } from '../../../../lib/db'
+import { prisma } from '../../../lib/db'
 
 export type FixtureTracker = {
   userIds: string[]
