@@ -223,6 +223,7 @@ Rules:
   - `gamification_state` + append-only `gamification_events` persisted in schema.
   - Assignment completion updates points and streak in the same transaction.
   - Dashboard shows current points, current/best streak, and last earned event.
+  - `/history` page shows recent completions/actions from chore, assignment, and gamification event streams.
 
 ## 13) Documentation Discipline
 
