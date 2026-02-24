@@ -45,6 +45,7 @@ MVP excludes:
 - TypeScript.
 - PostgreSQL (Supabase-compatible).
 - Prisma ORM.
+- Prisma client runtime uses Postgres driver adapter (`@prisma/adapter-pg`) with `DATABASE_URL`.
 - Server-side Claude API access only.
 
 ### Runtime boundaries

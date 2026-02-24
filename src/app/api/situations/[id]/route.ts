@@ -11,7 +11,7 @@ const updateSituationSchema = z.object({
   status: z.nativeEnum(SituationStatus).optional(),
 })
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const actorUserId = request.headers.get('x-user-id')
   if (!actorUserId) {
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
@@ -23,7 +23,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: 'Invalid situation payload', code: 'INVALID_PAYLOAD' }, { status: 400 })
     }
 
-    const id = params.id
+    const { id } = await context.params
     const data = parsed.data
     const existing = await prisma.specialSituation.findUnique({ where: { id } })
     if (!existing) {

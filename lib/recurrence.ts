@@ -21,6 +21,8 @@ export function addFrequency(date: Date, frequencyType: FrequencyType, frequency
       return next
     case FrequencyType.AS_NEEDED:
       return next
+    default:
+      return next
   }
 }
 

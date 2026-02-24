@@ -10,7 +10,7 @@ const createSituationItemSchema = z.object({
   dueDate: z.string().datetime().optional().nullable(),
 })
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const actorUserId = request.headers.get('x-user-id')
   if (!actorUserId) {
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
@@ -22,7 +22,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Invalid item payload', code: 'INVALID_PAYLOAD' }, { status: 400 })
     }
 
-    const situationId = params.id
+    const { id: situationId } = await context.params
     const data = parsed.data
 
     const result = await prisma.$transaction(async (tx) => {

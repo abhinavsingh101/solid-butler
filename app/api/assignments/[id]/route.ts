@@ -9,14 +9,14 @@ const updateAssignmentSchema = z.object({
   notes: z.string().max(500).optional().nullable(),
 })
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const actorUserId = request.headers.get('x-user-id')
   if (!actorUserId) {
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
   try {
-    const { id } = params
+    const { id } = await context.params
     const parsed = updateAssignmentSchema.safeParse(await request.json())
 
     if (!parsed.success) {

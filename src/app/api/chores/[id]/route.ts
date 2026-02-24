@@ -21,9 +21,9 @@ const updateChoreSchema = z.object({
   isActive: z.boolean().optional(),
 })
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params
+    const { id } = await context.params
     const parsed = updateChoreSchema.safeParse(await request.json())
 
     if (!parsed.success) {
@@ -88,9 +88,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params
+    const { id } = await context.params
 
     await prisma.chore.update({
       where: { id },

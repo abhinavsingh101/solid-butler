@@ -33,6 +33,13 @@ export function urgencyDefaultsForPriority(priority: Priority): UrgencyDefaults 
         urgencyGrowthPerDay: 1,
         urgencyMaxPoints: 6,
       }
+    default:
+      return {
+        estimatedMinutes: 10,
+        baseUrgencyPoints: 5,
+        urgencyGrowthPerDay: 1,
+        urgencyMaxPoints: 10,
+      }
   }
 }
 

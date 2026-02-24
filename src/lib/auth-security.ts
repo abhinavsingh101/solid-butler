@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import type { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
-import type { AuthAuditEventType } from '@prisma/client'
+import type { AuthAuditEventType, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 
 const DEFAULT_AUTH_RATE_LIMIT_WINDOW_MINUTES = 15
@@ -40,9 +40,6 @@ export function passwordMeetsPolicy(password: string): boolean {
 }
 
 export function getClientIp(request: Request | NextRequest): string {
-  const directIp = (request as NextRequest).ip
-  if (directIp) return directIp
-
   const forwardedFor = request.headers.get('x-forwarded-for')
   if (forwardedFor) {
     const candidate = forwardedFor.split(',')[0]?.trim()
@@ -60,7 +57,7 @@ export async function createAuthAuditEvent(params: {
   ipAddress?: string
   userAgent?: string
   reason?: string
-  metadata?: Record<string, unknown>
+  metadata?: Prisma.InputJsonValue
 }) {
   try {
     await prisma.authAuditEvent.create({

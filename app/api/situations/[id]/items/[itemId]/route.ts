@@ -12,7 +12,7 @@ const updateSituationItemSchema = z.object({
   displayOrder: z.number().int().min(0).max(500).optional(),
 })
 
-export async function PATCH(request: Request, { params }: { params: { id: string; itemId: string } }) {
+export async function PATCH(request: Request, context: { params: Promise<{ id: string; itemId: string }> }) {
   const actorUserId = request.headers.get('x-user-id')
   if (!actorUserId) {
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
@@ -24,8 +24,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: 'Invalid item payload', code: 'INVALID_PAYLOAD' }, { status: 400 })
     }
 
-    const situationId = params.id
-    const itemId = params.itemId
+    const { id: situationId, itemId } = await context.params
     const data = parsed.data
 
     const updated = await prisma.$transaction(async (tx) => {
