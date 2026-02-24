@@ -31,6 +31,7 @@ This is the canonical decision log for the project.
 | DEC-019 | 2026-02-24 | ACTIVE | Backlog safety valve | If multiple high-urgency tasks pile up on a day, mark it as a busy day and suggest a 30- or 60-minute focus block. | Provides a simple recovery path when backlog accumulates. | Assistant planning must treat flagged days as higher load and surface focus recommendations. |
 | DEC-020 | 2026-02-24 | ACTIVE | Assignment capture UX | Support one-step quick assignment for ad-hoc household tasks between members. | Real usage needs immediate capture (for example, one partner assigning a quick task to the other). | Dashboard includes quick-assignment flow that creates/uses a chore template and assigns instantly. |
 | DEC-021 | 2026-02-24 | ACTIVE | Situation generation safety | Special-situation checklist generation must be schema-validated server-side and fall back to a safe template when LLM output is missing/invalid. | Keeps workflow reliable even when model output is imperfect or unavailable. | Users always get an editable checklist; no hard failure in core flow. |
+| DEC-022 | 2026-02-24 | ACTIVE | MVP points formula | Award completion points with priority-based base values and capped overdue deduction. | Keeps scoring understandable while still penalizing lateness. | Gamification state updates on completion and dashboard shows points/streak summary. |
 
 ## Change Rule
 When a decision changes:

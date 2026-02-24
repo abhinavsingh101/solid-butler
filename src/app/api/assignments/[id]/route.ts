@@ -2,6 +2,7 @@ import { AssignmentEventType, AssignmentStatus, ChoreHistoryAction, SourceChanne
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
+import { applyCompletionGamification } from '@/lib/gamification'
 
 const updateAssignmentSchema = z.object({
   status: z.nativeEnum(AssignmentStatus).optional(),
@@ -24,7 +25,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     const data = parsed.data
 
-    const assignment = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const existing = await tx.choreAssignment.findUnique({ where: { id } })
       if (!existing) {
         throw new Error('NOT_FOUND')
@@ -48,6 +49,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           },
         },
       })
+
+      let gamification:
+        | {
+            awardedPoints: number
+            basePoints: number
+            deduction: number
+            overdueDays: number
+            currentPoints: number
+            currentStreak: number
+            bestStreak: number
+          }
+        | null = null
 
       if (data.status && data.status !== existing.status) {
         const eventType =
@@ -76,6 +89,27 @@ export async function PATCH(request: Request, { params }: { params: { id: string
               notes: updated.notes,
             },
           })
+
+          if (data.status === AssignmentStatus.COMPLETED) {
+            const completion = await applyCompletionGamification({
+              tx,
+              userId: updated.assignedToId,
+              assignmentId: updated.id,
+              dueDate: updated.dueDate,
+              completedAt: updated.completedAt ?? new Date(),
+              priority: updated.chore.priority,
+            })
+
+            gamification = {
+              awardedPoints: completion.points.pointsAwarded,
+              basePoints: completion.points.basePoints,
+              deduction: completion.points.deduction,
+              overdueDays: completion.points.overdueDays,
+              currentPoints: completion.state.currentPoints,
+              currentStreak: completion.state.currentStreak,
+              bestStreak: completion.state.bestStreak,
+            }
+          }
         }
       } else if (data.notes !== undefined && data.notes !== existing.notes) {
         await tx.assignmentEvent.create({
@@ -88,10 +122,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         })
       }
 
-      return updated
+      return { assignment: updated, gamification }
     })
 
-    return NextResponse.json({ assignment })
+    return NextResponse.json(result)
   } catch (error) {
     if (error instanceof Error && error.message === 'NOT_FOUND') {
       return NextResponse.json({ error: 'Assignment not found', code: 'NOT_FOUND' }, { status: 404 })

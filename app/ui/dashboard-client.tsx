@@ -45,6 +45,32 @@ type DashboardPayload = {
   }>
 }
 
+type GamificationSummaryPayload = {
+  currentUser: {
+    userId: string
+    currentPoints: number
+    currentStreak: number
+    bestStreak: number
+    lastCompletionDate: string | null
+  }
+  lastEarnedEvent: {
+    pointsDelta: number
+    createdAt: string
+    reason: string | null
+  } | null
+  household: Array<{
+    user: {
+      id: string
+      username: string
+      displayName: string
+    }
+    currentPoints: number
+    currentStreak: number
+    bestStreak: number
+    lastCompletionDate: string | null
+  }>
+}
+
 const priorityClass: Record<string, string> = {
   HIGH: 'border-red-500/40',
   MEDIUM: 'border-yellow-500/40',
@@ -62,6 +88,7 @@ export function DashboardClient() {
   const [quickNotes, setQuickNotes] = useState('')
   const [quickDueDate, setQuickDueDate] = useState('')
   const [quickLoading, setQuickLoading] = useState(false)
+  const [gamification, setGamification] = useState<GamificationSummaryPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionError, setActionError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -74,15 +101,17 @@ export function DashboardClient() {
     setActionError('')
 
     try {
-      const [data, usersData] = await Promise.all([
+      const [data, usersData, gamificationData] = await Promise.all([
         fetchJson<DashboardPayload>('/api/assignments?view=dashboard'),
         fetchJson<{ users: Array<{ id: string; displayName: string; username: string }> }>('/api/users'),
+        fetchJson<GamificationSummaryPayload>('/api/gamification/summary'),
       ])
       setOverdue(data.overdue)
       setToday(data.today)
       setPriorityPlan(data.priorityPlan)
       setBusyDays(data.busyDays)
       setUsers(usersData.users)
+      setGamification(gamificationData)
       if (!quickAssigneeId && usersData.users[0]) {
         setQuickAssigneeId(usersData.users[0].id)
       }
@@ -176,6 +205,43 @@ export function DashboardClient() {
           {schedulerLoading ? 'Refreshing...' : 'Generate Due Chores'}
         </button>
       </div>
+
+      {gamification && (
+        <section className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">Points and Streak</h2>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="rounded-lg border border-emerald-400/20 bg-zinc-950/40 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-emerald-100/80">Points</p>
+              <p className="mt-1 text-xl font-semibold text-emerald-100">{gamification.currentUser.currentPoints}</p>
+            </div>
+            <div className="rounded-lg border border-emerald-400/20 bg-zinc-950/40 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-emerald-100/80">Current Streak</p>
+              <p className="mt-1 text-xl font-semibold text-emerald-100">{gamification.currentUser.currentStreak}</p>
+            </div>
+            <div className="rounded-lg border border-emerald-400/20 bg-zinc-950/40 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-emerald-100/80">Best Streak</p>
+              <p className="mt-1 text-xl font-semibold text-emerald-100">{gamification.currentUser.bestStreak}</p>
+            </div>
+          </div>
+          {gamification.lastEarnedEvent && (
+            <p className="mt-2 text-xs text-emerald-100/80">
+              Last earned: +{gamification.lastEarnedEvent.pointsDelta} on{' '}
+              {new Date(gamification.lastEarnedEvent.createdAt).toLocaleString()}
+            </p>
+          )}
+          {gamification.household.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs uppercase tracking-wide text-emerald-100/70">Household Snapshot</p>
+              {gamification.household.map((entry) => (
+                <div key={entry.user.id} className="flex items-center justify-between rounded-lg border border-emerald-400/20 bg-zinc-950/40 px-3 py-2">
+                  <p className="text-sm font-medium text-emerald-100">{entry.user.displayName}</p>
+                  <p className="text-xs text-emerald-100/80">{entry.currentPoints} pts • streak {entry.currentStreak}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {priorityPlan.length > 0 && (
         <section className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4">

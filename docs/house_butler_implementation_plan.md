@@ -143,6 +143,10 @@ Keep it simple:
 - Award points for `completed` actions.
 - Apply overdue deduction if completion is after due date.
 - Track daily streak based on at least one completion in a day.
+- MVP formula implementation:
+  - Base points by priority (`HIGH=12`, `MEDIUM=10`, `LOW=8`).
+  - Overdue deduction capped to avoid demotivation.
+  - Never award less than 1 point for a completion.
 - Show only:
   - current points
   - current streak
@@ -215,6 +219,10 @@ Rules:
 - Points/streak events and summary UI.
 - Refined dark-mode UI pass.
 - Release hardening and docs audit.
+- Current implementation checkpoint:
+  - `gamification_state` + append-only `gamification_events` persisted in schema.
+  - Assignment completion updates points and streak in the same transaction.
+  - Dashboard shows current points, current/best streak, and last earned event.
 
 ## 13) Documentation Discipline
 

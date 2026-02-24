@@ -97,6 +97,10 @@ enum SummaryType {
   GENERAL
 }
 
+enum GamificationEventType {
+  CHORE_COMPLETED
+}
+
 model User {
   id                  String    @id @default(cuid())
   username            String    @unique
@@ -116,6 +120,8 @@ model User {
   defaultChores        Chore[]            @relation("ChoreDefaultAssignee")
   assignmentEventsMade AssignmentEvent[] @relation("AssignmentActor")
   feedbackEventsMade   AiFeedbackEvent[]
+  gamificationState    GamificationState?
+  gamificationEvents   GamificationEvent[]
 
   @@index([lockoutUntil])
 }
@@ -292,4 +298,34 @@ model MemorySummary {
 
   @@index([summaryType, updatedAt])
   @@index([subjectKey, updatedAt])
+}
+
+model GamificationState {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  currentPoints      Int      @default(0)
+  currentStreak      Int      @default(0)
+  bestStreak         Int      @default(0)
+  lastCompletionDate DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model GamificationEvent {
+  id          String                @id @default(cuid())
+  userId      String
+  eventType   GamificationEventType
+  pointsDelta Int                   @default(0)
+  assignmentId String?
+  reason      String?
+  metadata    Json?
+  createdAt   DateTime              @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([eventType, createdAt])
+  @@unique([assignmentId, eventType])
 }
