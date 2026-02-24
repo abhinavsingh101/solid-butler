@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# House Butler (MVP)
 
-## Getting Started
+House Butler is a two-member household chore app focused on reliable daily use first:
+- manual assignment before automation,
+- durable history for future AI learning,
+- practical prioritization with urgency budgeting,
+- special-situation checklist generation.
 
-First, run the development server:
+Canonical product/implementation docs:
+- `docs/purpose_and_scope.md`
+- `docs/decision_log.md`
+- `docs/house_butler_implementation_plan.md`
+
+## Prerequisites
+
+- Node.js 20+
+- npm 10+
+- PostgreSQL 16 (local)
+
+## Environment
+
+1. Copy `.env.example` to `.env.local`.
+2. Set required values:
+   - `DATABASE_URL`
+   - `JWT_SECRET`
+   - `CLAUDE_API_KEY`
+   - `NEXT_PUBLIC_APP_URL`
+
+Note:
+- This repo includes a placeholder `.env` for tooling defaults.
+- Local runtime should use `.env.local`.
+
+## Local Setup
 
 ```bash
+npm install
+npx prisma migrate dev
+npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App URL:
+- [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Seeded Login Accounts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+After `npm run db:seed`:
+- `abhinav / ChangeMeAbhinav1`
+- `partner / ChangeMePartner1`
 
-## Learn More
+## Test Commands
 
-To learn more about Next.js, take a look at the following resources:
+Unit + integration:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm test
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Targeted:
 
-## Deploy on Vercel
+```bash
+npm run test:unit
+npm run test:integration
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+E2E (Playwright):
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+## Build Check
+
+```bash
+npm run build
+```
+
+## MVP QA Checklist (Manual)
+
+- Add to Home Screen works on iOS and Android.
+- Login lockout behavior works after repeated failed attempts.
+- Scheduler is idempotent (no duplicate pending assignment for same chore window).
+- Special-situation checklist is editable and persists after refresh.
+
+## CI Gate
+
+GitHub Actions runs on PRs and `main` pushes:
+- `npm test` (Postgres-backed),
+- `npm run build`.

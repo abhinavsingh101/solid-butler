@@ -185,7 +185,7 @@ Rules:
 - Unit tests for recurrence calculation, streak logic, and auth helpers.
 - Integration tests for auth + core API flows.
 - End-to-end happy path: login -> assign chore -> complete chore -> points/streak update.
-- Current implementation checkpoint:
+  - Current implementation checkpoint:
   - Vitest configured with shared test environment bootstrap (`tests/setup/env.ts`).
   - Unit tests implemented for recurrence, streak computation, and JWT auth helpers.
   - Integration fixture harness added for DB-backed API tests with deterministic cleanup.
@@ -198,6 +198,7 @@ Rules:
     - invalid login error path
     - login -> quick assign -> complete -> gamification summary update
   - CI gate added to run Postgres-backed test suite and production build on pull requests and `main`.
+  - Repository runbook (`README.md`) now documents local setup, seeded credentials, test commands, and MVP manual QA checklist.
 
 ### Manual checks (release checklist)
 - Add to Home Screen works on iOS and Android.
