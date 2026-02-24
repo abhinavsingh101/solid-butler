@@ -2,14 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-
-function getCookieValue(name: string): string {
-  const cookie = document.cookie
-    .split('; ')
-    .find((row) => row.startsWith(`${name}=`))
-
-  return cookie ? decodeURIComponent(cookie.split('=')[1] || '') : ''
-}
+import { fetchJson } from '@/app/ui/client-api'
 
 export function LogoutButton() {
   const router = useRouter()
@@ -19,12 +12,8 @@ export function LogoutButton() {
     setLoading(true)
 
     try {
-      const csrfToken = getCookieValue('csrf-token')
-      await fetch('/api/auth/logout', {
+      await fetchJson('/api/auth/logout', {
         method: 'POST',
-        headers: {
-          'x-csrf-token': csrfToken,
-        },
       })
       router.push('/login')
       router.refresh()
