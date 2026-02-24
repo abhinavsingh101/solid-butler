@@ -225,6 +225,7 @@ Rules:
   - Assignment completion updates points and streak in the same transaction.
   - Dashboard shows current points, current/best streak, and last earned event.
   - `/history` page shows recent completions/actions from chore, assignment, and gamification event streams.
+  - Next.js 16 build hygiene updates applied (`proxy.ts` convention and viewport-based theme color).
 
 ## 13) Documentation Discipline
 
