@@ -1,220 +1,224 @@
-# The House Butler – Implementation Plan
+# The House Butler - Implementation Plan (Active)
 
-A private Progressive Web App for 2 household members to manage chores and special situations, with Anthropic Claude integration that learns household patterns over time.
+This is the active implementation plan.
+It must stay aligned with:
+- `docs/purpose_and_scope.md`
+- `docs/decision_log.md`
 
----
+## 1) Build Strategy
 
-## Architecture Decisions & Rationale
+Build a practical MVP first, while keeping schema and architecture easy to extend later.
 
-### Why Next.js (not plain React + separate backend)?
-- Single deployment unit: Next.js API Routes serve as the backend, keeping secrets (Claude API key, DB credentials) server-side
-- Easy Vercel deployment — one `git push` deploys everything
-- Server-side rendering improves mobile performance on first load
-- No CORS configuration needed since frontend and API are co-located
+### MVP Design Principles
+- Keep core workflows reliable before adding advanced AI behavior.
+- Store durable history from day 1.
+- Make every major feature testable with clear acceptance checks.
+- Prefer simple defaults over configurable complexity.
 
-### Why PostgreSQL (via Supabase)?
-- Relational model fits chores + users + assignments + history naturally
-- Supabase gives us a free-tier managed Postgres and easy local dev with Docker
-- Unlike SQLite, it scales when they move to a home server
-- Row-level access patterns are straightforward for 2 users
+## 2) MVP Feature Contract
 
-### PWA Constraints
-- **iOS Safari (16.4+):** Supports Web Push, service workers, and Add to Home Screen
-- **Android Chrome:** Full PWA support
-- Must serve over HTTPS (Vercel handles this automatically)
-- App manifest + service worker required for installability
+MVP includes:
+- 2-user password login.
+- Chore catalog management (add/edit/archive).
+- Manual assignment to a household member.
+- Recurring due logic for chores.
+- Mark done / skipped, with timestamps and notes.
+- Priority labels (`high`, `medium`, `low`).
+- Special situations: free-text input -> generated checklist -> editable and saveable.
+- Lightweight gamification: points + streaks.
+- Installable web app (Add to Home Screen).
 
-### LLM Strategy (Claude)
-- All Claude calls go through server-side API routes (API key never exposed to client)
-- A **persistent memory table** summarizes household history — passed to Claude on every relevant call
-- Special situations: user types free text → server sends structured prompt with history context → Claude returns JSON checklist
-- Future-ready: `chore_history` table is populated from day 1 so Phase 2 LLM suggestions have real data to learn from
+MVP excludes:
+- Fully automatic chore assignment.
+- Escalating reminder logic.
+- Full offline-first functionality.
+- Extra channels like WhatsApp/SMS/email.
+- Voice input/output workflows (planned post-MVP).
 
----
+## 3) Architecture
 
-## Data Model
+### App stack
+- Next.js App Router.
+- TypeScript.
+- PostgreSQL (Supabase-compatible).
+- Prisma ORM.
+- Server-side Claude API access only.
 
-```sql
--- Users
-users (id, username, display_name, password_hash, created_at)
+### Runtime boundaries
+- UI pages and server route handlers live in app routes.
+- Business logic in `src/lib/*` modules.
+- DB writes go through typed service functions, not directly from UI components.
 
--- Chores master list
-chores (id, name, description, category, priority, frequency_type, frequency_value, is_active, created_at)
--- frequency_type: 'daily' | 'weekly' | 'monthly' | 'as_needed'
--- priority: 'high' | 'medium' | 'low'
--- category: 'cleaning' | 'cooking' | 'laundry' | 'maintenance' | 'shopping' | 'other'
+### Deployment target
+- Vercel + managed Postgres for MVP.
 
--- Chore assignments (scheduled instances)
-chore_assignments (id, chore_id, assigned_to_user_id, due_date, status, created_at, completed_at, notes)
--- status: 'pending' | 'completed' | 'skipped'
+## 4) Minimum Auth Hardening (MVP)
 
--- Full history (append-only, never deleted — LLM training data)
-chore_history (id, chore_id, user_id, action, timestamp, notes)
--- action: 'assigned' | 'completed' | 'skipped' | 'reassigned'
+This is required before production deployment:
+- Bcrypt password hashing.
+- Password policy: minimum length and basic strength validation.
+- Login rate limiting per IP and username.
+- Temporary lockout after repeated failed login attempts.
+- Secure session cookies (`HttpOnly`, `Secure` in production, `SameSite=Strict`).
+- CSRF protection on state-changing routes.
+- Auth audit events (login success/failure, logout).
 
--- Special situations
-special_situations (id, title, raw_input, event_date, created_by_user_id, created_at, status)
--- status: 'active' | 'completed' | 'cancelled'
+## 5) Data Model Plan
 
--- Situation checklist items (LLM-generated)
-situation_items (id, situation_id, title, description, assigned_to_user_id, due_date, status, display_order)
+### Core entities
+- `users`
+- `chores`
+- `chore_assignments`
+- `chore_history` (append-only)
+- `assignment_events` (append-only behavior events)
+- `special_situations`
+- `situation_items`
+- `gamification_state`
+- `gamification_events` (append-only)
+- `ai_feedback_events` (append-only acceptance/rejection/edit outcomes)
+- `memory_summary` (curated household memory)
 
--- LLM memory / household context (summary updated by Claude periodically)
-llm_memory (id, context_type, summary, raw_data, created_at, updated_at)
--- context_type: 'household_preferences' | 'chore_patterns' | 'situation_history'
-```
+### Modeling rules
+- Use enums for bounded fields (priority, status, action types).
+- Add uniqueness where idempotency depends on it (for example, seed keys).
+- Add indexes for main reads: by due date, assignee, and status.
+- Keep append-only event tables for history and auditability.
 
-> **Key design principle:** `chore_history` is append-only and populated from day 1. This is what enables the LLM to make intelligent suggestions in Phase 2 without any schema changes.
+## 6) Recurrence and Due-Generation (Core Reliability)
 
----
+MVP recurrence model:
+- `daily_every_n_days`
+- `weekly_every_n_weeks`
+- `monthly_every_n_months`
+- `as_needed`
 
-## Tech Stack
+Execution approach:
+- Maintain `next_due_at` per chore template.
+- Run a scheduler job (or cron-triggered endpoint) that creates pending assignments when due.
+- Scheduler must be idempotent (safe to run multiple times).
+- If multiple periods were missed, generate only one current pending assignment by default (simple backlog behavior for MVP).
 
-| Layer | Choice | Rationale |
-|-------|--------|-----------|
-| Framework | Next.js 14 (App Router) | Full-stack, Vercel-native, SSR for mobile perf |
-| Language | TypeScript | Type safety across frontend + backend |
-| Database | PostgreSQL via Supabase | Free tier, managed, scales to home server |
-| ORM | Prisma | Type-safe, auto-generates migrations |
-| Auth | Custom JWT + bcrypt | No OAuth needed; private app |
-| LLM | Anthropic Claude (`@anthropic-ai/sdk`) | User preference + API key in hand |
-| Styling | Tailwind CSS | Rapid, consistent dark-mode UI |
-| PWA | `next-pwa` | Service worker + manifest for installability |
-| Deployment | Vercel | One-click from GitHub |
+## 7) LLM and Memory Architecture (MVP)
 
----
+Reference docs for future agents:
+- `docs/openclaw_memory_architecture_reference.md`
+- `docs/openclaw_to_house_butler_memory_translation.md`
 
-## Project Structure
+Two-layer memory pattern:
+- Layer A: append-only raw events (`chore_history`, `assignment_events`, `special_situations`, `gamification_events`, `ai_feedback_events`).
+- Layer B: curated durable summaries (`memory_summary`) for stable preferences and patterns.
 
-```
-house-butler/
-├── prisma/
-│   ├── schema.prisma          # Full data model
-│   └── seed.ts                # Pre-seeded chore list
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx         # Root layout (dark theme, PWA meta)
-│   │   ├── page.tsx           # Dashboard (today's chores)
-│   │   ├── chores/            # Chore list management
-│   │   ├── situations/        # Special situations
-│   │   ├── history/           # Chore history view
-│   │   └── api/
-│   │       ├── auth/          # Login, logout, session
-│   │       ├── chores/        # CRUD + assignments
-│   │       ├── situations/    # Create, list, update items
-│   │       └── llm/           # Claude integration endpoints
-│   ├── components/            # Reusable UI components
-│   ├── lib/
-│   │   ├── db.ts              # Prisma client singleton
-│   │   ├── auth.ts            # JWT helpers
-│   │   └── claude.ts          # Claude API wrapper + prompt builder
-│   └── middleware.ts          # Route protection (JWT check)
-├── public/
-│   ├── manifest.json          # PWA manifest
-│   └── icons/                 # App icons (192×192, 512×512)
-└── .env.local                 # CLAUDE_API_KEY, DATABASE_URL, JWT_SECRET
-```
+Behavioral learning rule:
+- In-app interactions are first-class memory signals, not just analytics.
+- Signals include self-assignment choices, completion time patterns, suggestion acceptance/rejection, and checklist edits.
 
----
+For special-situation generation:
+- Input: free text + optional event date.
+- Retrieval context:
+  - recent relevant events (recency-weighted)
+  - curated summary snippets
+- Default behavior for MVP: include assignee auto-suggestions for checklist items, but always allow user override.
+- Output must be validated against a strict JSON schema before save.
+- If generation fails, return a safe template checklist and log the failure.
 
-## Key Components
+## 8) Lightweight Gamification (MVP)
 
-### `src/lib/claude.ts`
-- `generateSituationChecklist(rawInput, eventDate, householdHistory)` — core LLM call
-- Prompt includes: event description, event date, summary of past similar situations from `llm_memory`
-- Returns structured JSON: `{ items: [{ title, description, suggestedDueDate, suggestedAssignee }] }`
-- Graceful error handling with fallback to a generic template
+Keep it simple:
+- Award points for `completed` actions.
+- Apply overdue deduction if completion is after due date.
+- Track daily streak based on at least one completion in a day.
+- Show only:
+  - current points
+  - current streak
+  - last earned event
 
-### `src/middleware.ts`
-- Protects all routes except `/login`
-- Reads JWT from `HttpOnly` cookie
-- Attaches `userId` to request headers for downstream API routes
+No leaderboards, multipliers, or penalty logic in MVP.
 
-### Dashboard (`/`)
-- "Today's Chores" — assignments due today or overdue, sorted by priority
-- Quick-complete toggle per item
-- Name badge showing whose chore is whose
+## 9) UI Surface (MVP)
 
-### Special Situations (`/situations`)
-- Free-text input field ("Describe your situation...")
-- Date picker for event date
-- Submit → LLM call → renders editable checklist
-- Each item: title, assignee, due date, status toggle
+Required pages:
+- Login
+- Dashboard (today/overdue assignments)
+- Chores (catalog management)
+- Special Situations (free-text + checklist editor)
+- History (recent completions and actions)
 
----
+## 10) API Surface (MVP)
 
-## Pre-Seeded Chore List
+Required route groups:
+- `auth` (login/logout/session)
+- `chores` (CRUD)
+- `assignments` (list/create/update status)
+- `situations` (create/list/update checklist items)
+- `gamification` (summary)
 
-| Chore                       | Frequency  | Priority |
-| --------------------------- | ---------- | -------- |
-| Wipe drawing room surfaces  | 3-days     | Medium   |
-| Wipe living room surfaces   | 3-days     | Medium   |
-| Wipe bedrooms surfaces      | 3-days     | Medium   |
-| Dust sofas                  | 7-days     | Medium   |
-| Dust blinds                 | 7-days     | Low      |
-| Clean bathrooms             | 3-days     | High     |
-| Clean wash basins           | 7-days     | High     |
-| Clean kitchen counters      | Daily      | High     |
-| Do laundry                  | 3-days     | Medium   |
-| Change bed sheets           | 7-days     | Medium   |
-| Buy vegetables              | Weekly     | High     |
-| Water plants                | Twice/week | Medium   |
-| Restock pantry              | As needed  | Medium   |
-| Get wheat ground into flour | Monthly    | Medium   |
+Rules:
+- Validate all request bodies server-side.
+- Return typed error codes/messages.
+- Log critical failures with request correlation IDs.
 
+## 11) Testing and Quality Gates
 
----
+### Automated tests
+- Unit tests for recurrence calculation, streak logic, and auth helpers.
+- Integration tests for auth + core API flows.
+- End-to-end happy path: login -> assign chore -> complete chore -> points/streak update.
 
-## Environment Variables
+### Manual checks (release checklist)
+- Add to Home Screen works on iOS and Android.
+- Login lockout behaves correctly.
+- Scheduler is idempotent.
+- Special-situation checklist is editable and persists.
 
-```env
-DATABASE_URL=               # Supabase PostgreSQL connection string
-JWT_SECRET=                 # Random 32+ char secret
-CLAUDE_API_KEY=             # Anthropic API key
-NEXT_PUBLIC_APP_URL=        # Deployed URL (for PWA manifest)
-```
+## 12) Delivery Slices
 
----
+### Slice 1: Foundation
+- Fix app structure consistency.
+- Stabilize Prisma schema + migrations.
+- Implement auth hardening baseline.
 
-## What's Intentionally Deferred
+### Slice 2: Chore engine
+- Chore CRUD.
+- Assignment and status update flow.
+- Recurrence + due-generation scheduler.
+- Dashboard for today/overdue chores.
 
-| Feature | Reason |
-|---------|--------|
-| Gamification (points, streaks) | Needs solid chore completion history first |
-| Push notifications / reminders | Needs usage patterns to calibrate |
-| LLM chore suggestions | `llm_memory` table collects data now; surfaced in Phase 2 |
-| Escalating reminders | Phase 3 |
-| Home server migration | When user is ready |
+### Slice 3: Special situations and memory
+- Situation creation and checklist persistence.
+- Claude generation with schema validation.
+- Memory summary retrieval and periodic refresh.
 
----
+### Slice 4: Gamification and polish
+- Points/streak events and summary UI.
+- Refined dark-mode UI pass.
+- Release hardening and docs audit.
 
-## Verification Plan
+## 13) Documentation Discipline
 
-### Local DB & Seed
-```bash
-npx prisma migrate dev --name init
-npx prisma db seed
-npx prisma studio   # Visual DB browser at localhost:5555
-```
-Verify: all tables created, 14+ chores visible.
+For each merged feature change:
+1. Update this implementation plan section(s).
+2. If decision changed, add a row to `docs/decision_log.md`.
+3. If purpose/scope changed, update `docs/purpose_and_scope.md`.
 
-### Auth Flow
-- `GET /` → redirects to `/login` ✓
-- Login → `HttpOnly` JWT cookie set ✓
-- `curl /api/chores` (no cookie) → 401 ✓
+## 14) Voice Support Roadmap (Post-MVP)
 
-### Chore Management
-- Create chore → assign → mark complete → verify `chore_history` row created
+Voice is part of the long-term feature set.
 
-### Special Situations (LLM)
-- Type: "We're going on a trip to Goa on March 15"
-- Verify: contextual checklist appears (visa, packing, tickets, etc.)
-- Edit item assignee → verify persists
+Planned direction:
+- Voice input: convert spoken chore/situation notes into structured actions.
+- Voice output: optional spoken summaries (today's chores, overdue items, checklist highlights).
+- Conversation safety: spoken commands still require confirmation for destructive actions.
+- Shared memory path: voice and typed inputs write to the same event/history pipeline.
 
-### PWA Install
-- iOS Safari: Share → "Add to Home Screen" → opens in standalone mode ✓
-- Android Chrome: install prompt → standalone mode ✓
+## 15) Provisional MVP Defaults (Revisit After Usage Data)
 
----
+Defaults locked for MVP:
+- Overdue backlog: one current pending assignment per chore.
+- Points: award for all completions, with overdue deduction.
+- Special situations: auto-suggest assignee for generated checklist items.
 
-*Plan created: 2026-02-24*
+Revisit rule:
+- Re-evaluate these defaults after 4-6 weeks of real household use.
+- If behavior is changed, record it in `docs/decision_log.md` as a new decision and mark older rows `SUPERSEDED`.
+
+*Last updated: 2026-02-24*

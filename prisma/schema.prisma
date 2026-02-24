@@ -1,122 +1,291 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ChoreCategory {
+  CLEANING
+  COOKING
+  LAUNDRY
+  MAINTENANCE
+  SHOPPING
+  OTHER
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum FrequencyType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  AS_NEEDED
+}
+
+enum AssignmentStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+enum ChoreHistoryAction {
+  ASSIGNED
+  COMPLETED
+  SKIPPED
+  REASSIGNED
+}
+
+enum SituationStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum SituationItemStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+enum MemoryContextType {
+  HOUSEHOLD_PREFERENCES
+  CHORE_PATTERNS
+  SITUATION_HISTORY
+}
+
+enum AssignmentEventType {
+  CREATED
+  REASSIGNED
+  COMPLETED
+  SKIPPED
+  DUE_DATE_CHANGED
+  NOTES_UPDATED
+}
+
+enum SuggestionFeedbackAction {
+  ACCEPTED
+  MODIFIED
+  REJECTED
+}
+
+enum SourceChannel {
+  UI
+  TEXT
+  VOICE
+  SYSTEM
+}
+
+enum AuthAuditEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  LOGIN_BLOCKED
+  LOCKOUT_TRIGGERED
+  LOGOUT
+}
+
+enum SummaryType {
+  ASSIGNEE_PREFERENCE
+  TIMING_PATTERN
+  SITUATION_PATTERN
+  GENERAL
 }
 
 model User {
-  id          String   @id @default(cuid())
-  username    String   @unique
-  displayName String
-  passwordHash String
-  createdAt   DateTime @default(now())
+  id                  String    @id @default(cuid())
+  username            String    @unique
+  displayName         String
+  passwordHash        String
+  failedLoginAttempts Int       @default(0)
+  lockoutUntil        DateTime?
+  lastFailedLoginAt   DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  assignedChores     ChoreAssignment[] @relation("AssignedTo")
-  choreHistory       ChoreHistory[]
-  createdSituations  SpecialSituation[]
-  situationItems     SituationItem[]
+  assignedChores       ChoreAssignment[] @relation("AssignedTo")
+  choreHistory         ChoreHistory[]
+  createdSituations    SpecialSituation[]
+  situationItems       SituationItem[]
+  authAuditEvents      AuthAuditEvent[]
+  defaultChores        Chore[]            @relation("ChoreDefaultAssignee")
+  assignmentEventsMade AssignmentEvent[] @relation("AssignmentActor")
+  feedbackEventsMade   AiFeedbackEvent[]
+
+  @@index([lockoutUntil])
 }
-
-
-
-
-
-
 
 model Chore {
   id             String        @id @default(cuid())
-  name           String
+  name           String        @unique
   description    String?
-  category       String        @default("OTHER")
-  priority       String        @default("MEDIUM")
-  frequencyType  String        @default("WEEKLY")
-  frequencyValue Int           @default(1) // e.g. every N weeks
+  category       ChoreCategory @default(OTHER)
+  priority       Priority      @default(MEDIUM)
+  frequencyType  FrequencyType @default(WEEKLY)
+  frequencyValue Int           @default(1)
   isActive       Boolean       @default(true)
+  defaultAssigneeId String?
+  nextDueAt      DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  assignments ChoreAssignment[]
-  history     ChoreHistory[]
+  defaultAssignee User?            @relation("ChoreDefaultAssignee", fields: [defaultAssigneeId], references: [id])
+  assignments    ChoreAssignment[]
+  history        ChoreHistory[]
+
+  @@index([isActive, priority])
+  @@index([nextDueAt])
 }
-
-
 
 model ChoreAssignment {
-  id              String           @id @default(cuid())
-  choreId         String
-  assignedToId    String
-  dueDate         DateTime
-  status          String           @default("PENDING")
-  notes           String?
-  createdAt       DateTime         @default(now())
-  completedAt     DateTime?
+  id           String           @id @default(cuid())
+  choreId      String
+  assignedToId String
+  dueDate      DateTime
+  status       AssignmentStatus @default(PENDING)
+  notes        String?
+  createdAt    DateTime         @default(now())
+  completedAt  DateTime?
 
-  chore      Chore @relation(fields: [choreId], references: [id])
-  assignedTo User  @relation("AssignedTo", fields: [assignedToId], references: [id])
+  chore      Chore              @relation(fields: [choreId], references: [id])
+  assignedTo User               @relation("AssignedTo", fields: [assignedToId], references: [id])
+  events     AssignmentEvent[]
+
+  @@index([assignedToId, status, dueDate])
+  @@index([choreId, dueDate])
 }
 
-
-
-// Append-only. Never delete rows from this table.
-// This is the LLM's memory for learning household patterns.
 model ChoreHistory {
-  id        String        @id @default(cuid())
-  choreId   String
-  userId    String
-  action    String
-  notes     String?
-  timestamp DateTime      @default(now())
+  id           String           @id @default(cuid())
+  choreId      String
+  userId       String
+  action       ChoreHistoryAction
+  notes        String?
+  assignmentId String?
+  timestamp    DateTime         @default(now())
 
   chore Chore @relation(fields: [choreId], references: [id])
   user  User  @relation(fields: [userId], references: [id])
+
+  @@index([userId, timestamp])
+  @@index([choreId, timestamp])
 }
 
+model AssignmentEvent {
+  id              String              @id @default(cuid())
+  assignmentId    String
+  actorUserId     String?
+  eventType       AssignmentEventType
+  sourceChannel   SourceChannel       @default(UI)
+  metadata        Json?
+  suggestionId    String?
+  createdAt       DateTime            @default(now())
 
+  assignment ChoreAssignment @relation(fields: [assignmentId], references: [id])
+  actorUser  User?           @relation("AssignmentActor", fields: [actorUserId], references: [id])
+
+  @@index([assignmentId, createdAt])
+  @@index([actorUserId, createdAt])
+}
 
 model SpecialSituation {
-  id              String          @id @default(cuid())
-  title           String
-  rawInput        String          // The free-text the user typed
-  eventDate       DateTime?
-  status          String          @default("ACTIVE")
-  createdAt       DateTime        @default(now())
-  createdById     String
+  id          String          @id @default(cuid())
+  title       String
+  rawInput    String
+  eventDate   DateTime?
+  status      SituationStatus @default(ACTIVE)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  createdById String
 
   createdBy User            @relation(fields: [createdById], references: [id])
   items     SituationItem[]
+
+  @@index([createdById, createdAt])
 }
 
-
-
 model SituationItem {
-  id           String    @id @default(cuid())
-  situationId  String
-  title        String
-  description  String?
-  assignedToId String?
-  dueDate      DateTime?
-  status       String     @default("PENDING")
-  displayOrder Int        @default(0)
-  createdAt    DateTime   @default(now())
-  completedAt  DateTime?
+  id                String              @id @default(cuid())
+  situationId       String
+  title             String
+  description       String?
+  assignedToId      String?
+  dueDate           DateTime?
+  status            SituationItemStatus @default(PENDING)
+  displayOrder      Int                 @default(0)
+  suggestedBy       String?
+  suggestionReason  String?
+  suggestionConfidence Float?
+  createdAt         DateTime            @default(now())
+  completedAt       DateTime?
 
   situation  SpecialSituation @relation(fields: [situationId], references: [id])
   assignedTo User?            @relation(fields: [assignedToId], references: [id])
+
+  @@index([situationId, displayOrder])
+  @@index([assignedToId, status])
 }
 
+model AiFeedbackEvent {
+  id              String                   @id @default(cuid())
+  contextType     String
+  suggestionId    String
+  action          SuggestionFeedbackAction
+  actorUserId     String
+  sourceChannel   SourceChannel            @default(UI)
+  metadata        Json?
+  createdAt       DateTime                 @default(now())
 
+  actorUser User @relation(fields: [actorUserId], references: [id])
 
-// Condensed context for Claude. Updated periodically to stay within token limits.
+  @@index([contextType, createdAt])
+  @@index([suggestionId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model AuthAuditEvent {
+  id                String            @id @default(cuid())
+  type              AuthAuditEventType
+  userId            String?
+  attemptedUsername String?
+  ipAddress         String?
+  userAgent         String?
+  reason            String?
+  metadata          Json?
+  createdAt         DateTime          @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([type, createdAt])
+  @@index([attemptedUsername, createdAt])
+  @@index([ipAddress, createdAt])
+}
+
 model LlmMemory {
   id          String            @id @default(cuid())
-  contextType String            @unique
-  summary     String            // What Claude receives as context
-  rawData     Json?             // Supporting data for re-summarization
+  contextType MemoryContextType @unique
+  summary     String
+  rawData     Json?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+}
+
+model MemorySummary {
+  id                String      @id @default(cuid())
+  summaryType       SummaryType
+  subjectKey        String?
+  summaryText       String
+  confidence        Float       @default(0.5)
+  sourceWindowStart DateTime?
+  sourceWindowEnd   DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([summaryType, updatedAt])
+  @@index([subjectKey, updatedAt])
 }

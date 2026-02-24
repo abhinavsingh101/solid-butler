@@ -1,7 +1,19 @@
 # The House Butler – Engineering Rules
 
 > All agents and developers working on this project must follow these rules.
-> These are specific to this project's stack (Next.js 14, TypeScript, Prisma, PostgreSQL, Anthropic Claude, Vercel).
+> These are specific to this project's stack (Next.js App Router, TypeScript, Prisma, PostgreSQL, Anthropic Claude, Vercel).
+
+---
+
+## 0. Canonical Product Direction (Mandatory)
+
+- If documents conflict, follow:
+  1. `docs/purpose_and_scope.md`
+  2. `docs/decision_log.md`
+  3. `docs/house_butler_implementation_plan.md`
+- `docs/house-butler.md` and `docs/chores_app_discovery.md` are historical context, not canonical direction.
+- Voice support is a first-class product feature, but deferred beyond MVP.
+- In-app behavior must be captured as AI memory signals (assignment choices, timing patterns, completion outcomes, suggestion accept/reject).
 
 ---
 
@@ -106,12 +118,13 @@
 
 These are explicitly out of scope for the current phase. Do not scaffold, stub, or partially implement them — it creates confusion and tech debt:
 
-- Gamification (points, streaks, leaderboard)
+- Advanced gamification mechanics (leaderboards, multipliers, penalties)
 - Push notifications / reminders
 - Escalating reminder logic
 - LLM chore assignment suggestions (the *data collection* happens automatically; the *UI surface* is Phase 2)
 - Admin/owner roles
 - WhatsApp / SMS / email notifications
+- Voice input/output interaction flows (post-MVP)
 
 If you find yourself building something in this list, stop and check with the user.
 

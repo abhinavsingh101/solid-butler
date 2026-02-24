@@ -1,10 +1,4 @@
-import {
-  ChoreCategory,
-  FrequencyType,
-  MemoryContextType,
-  PrismaClient,
-  Priority,
-} from '@prisma/client'
+import { PrismaClient, ChoreCategory, FrequencyType, MemoryContextType, Priority } from '@prisma/client'
 import bcryptjs from 'bcryptjs'
 
 const prisma = new PrismaClient()

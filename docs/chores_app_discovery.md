@@ -1,7 +1,8 @@
 # The House Butler – Discovery & Requirements Document
 
-> **Purpose:** Living document for any agent picking up this project. Captures all requirements, decisions, deferred features, and open questions from the planning phase.
-> **User's own notes:** `/Users/palakmishra/repos/docs/house-butler.md` — do not modify.
+> **Status:** Planning-phase artifact and historical context.
+> **Canonical docs:** `docs/purpose_and_scope.md`, `docs/decision_log.md`, and `docs/house_butler_implementation_plan.md`.
+> **User's own notes:** `docs/house-butler.md` — keep as historical source.
 
 ---
 
