@@ -198,6 +198,7 @@ Rules:
     - invalid login error path
     - login -> quick assign -> complete -> gamification summary update
   - CI gate added to run Postgres-backed test suite and production build on pull requests and `main`.
+  - Separate CI Playwright smoke job added (with browser install, migrations, and artifact upload on failure).
   - Repository runbook (`README.md`) now documents local setup, seeded credentials, test commands, and MVP manual QA checklist.
 
 ### Manual checks (release checklist)

@@ -87,4 +87,5 @@ npm run build
 
 GitHub Actions runs on PRs and `main` pushes:
 - `npm test` (Postgres-backed),
-- `npm run build`.
+- `npm run build`,
+- `npm run test:e2e` (Playwright smoke).
