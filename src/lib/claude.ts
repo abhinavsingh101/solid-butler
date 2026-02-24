@@ -9,6 +9,7 @@ type ChecklistItem = {
 
 type ChecklistResponse = {
   items: ChecklistItem[]
+  source: 'claude' | 'fallback'
 }
 
 export async function generateSituationChecklist(
@@ -49,18 +50,19 @@ ${householdHistoryContext}`
 
     const content = response.content[0]
     if (content.type !== 'text') {
-      return { items: [] }
+      return { items: [], source: 'claude' }
     }
 
     const jsonText = content.text.trim().replace(/^```json/, '').replace(/```$/, '')
     const parsed = JSON.parse(jsonText) as Partial<ChecklistResponse>
 
     if (!Array.isArray(parsed.items)) {
-      return { items: [] }
+      return { items: [], source: 'claude' }
     }
 
     return {
       items: parsed.items.filter((item): item is ChecklistItem => typeof item?.title === 'string'),
+      source: 'claude',
     }
   } catch (error) {
     console.error('Claude API error:', error)
@@ -74,5 +76,6 @@ function getFallbackChecklist(): ChecklistResponse {
       { title: 'Tidy up the house', description: 'General cleanup before the event.' },
       { title: 'Check groceries', description: 'Ensure required supplies are available.' },
     ],
+    source: 'fallback',
   }
 }

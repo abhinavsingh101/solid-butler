@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 type NavProps = {
-  current: 'dashboard' | 'chores'
+  current: 'dashboard' | 'chores' | 'situations'
 }
 
 export function Nav({ current }: NavProps) {
@@ -20,6 +20,12 @@ export function Nav({ current }: NavProps) {
         className={`${base} ${current === 'chores' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-300 hover:bg-zinc-800'}`}
       >
         Chores
+      </Link>
+      <Link
+        href="/situations"
+        className={`${base} ${current === 'situations' ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-300 hover:bg-zinc-800'}`}
+      >
+        Situations
       </Link>
     </nav>
   )

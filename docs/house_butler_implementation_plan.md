@@ -206,6 +206,10 @@ Rules:
 - Situation creation and checklist persistence.
 - Claude generation with schema validation.
 - Memory summary retrieval and periodic refresh.
+- Current implementation checkpoint:
+  - `/situations` page with free-text input and generated editable checklist.
+  - Checklist item editing supports assignee, due date, title/description, and status updates.
+  - Generation is guarded with server-side validation and safe fallback checklist behavior.
 
 ### Slice 4: Gamification and polish
 - Points/streak events and summary UI.
