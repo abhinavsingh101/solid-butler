@@ -22,36 +22,19 @@ model User {
   situationItems     SituationItem[]
 }
 
-enum Priority {
-  HIGH
-  MEDIUM
-  LOW
-}
 
-enum ChoreCategory {
-  CLEANING
-  COOKING
-  LAUNDRY
-  MAINTENANCE
-  SHOPPING
-  OTHER
-}
 
-enum FrequencyType {
-  DAILY
-  WEEKLY
-  BIWEEKLY
-  MONTHLY
-  AS_NEEDED
-}
+
+
+
 
 model Chore {
   id             String        @id @default(cuid())
   name           String
   description    String?
-  category       ChoreCategory @default(OTHER)
-  priority       Priority      @default(MEDIUM)
-  frequencyType  FrequencyType @default(WEEKLY)
+  category       String        @default("OTHER")
+  priority       String        @default("MEDIUM")
+  frequencyType  String        @default("WEEKLY")
   frequencyValue Int           @default(1) // e.g. every N weeks
   isActive       Boolean       @default(true)
   createdAt      DateTime      @default(now())
@@ -61,18 +44,14 @@ model Chore {
   history     ChoreHistory[]
 }
 
-enum AssignmentStatus {
-  PENDING
-  COMPLETED
-  SKIPPED
-}
+
 
 model ChoreAssignment {
   id              String           @id @default(cuid())
   choreId         String
   assignedToId    String
   dueDate         DateTime
-  status          AssignmentStatus @default(PENDING)
+  status          String           @default("PENDING")
   notes           String?
   createdAt       DateTime         @default(now())
   completedAt     DateTime?
@@ -81,12 +60,7 @@ model ChoreAssignment {
   assignedTo User  @relation("AssignedTo", fields: [assignedToId], references: [id])
 }
 
-enum HistoryAction {
-  ASSIGNED
-  COMPLETED
-  SKIPPED
-  REASSIGNED
-}
+
 
 // Append-only. Never delete rows from this table.
 // This is the LLM's memory for learning household patterns.
@@ -94,7 +68,7 @@ model ChoreHistory {
   id        String        @id @default(cuid())
   choreId   String
   userId    String
-  action    HistoryAction
+  action    String
   notes     String?
   timestamp DateTime      @default(now())
 
@@ -102,18 +76,14 @@ model ChoreHistory {
   user  User  @relation(fields: [userId], references: [id])
 }
 
-enum SituationStatus {
-  ACTIVE
-  COMPLETED
-  CANCELLED
-}
+
 
 model SpecialSituation {
   id              String          @id @default(cuid())
   title           String
   rawInput        String          // The free-text the user typed
   eventDate       DateTime?
-  status          SituationStatus @default(ACTIVE)
+  status          String          @default("ACTIVE")
   createdAt       DateTime        @default(now())
   createdById     String
 
@@ -121,11 +91,7 @@ model SpecialSituation {
   items     SituationItem[]
 }
 
-enum ItemStatus {
-  PENDING
-  COMPLETED
-  SKIPPED
-}
+
 
 model SituationItem {
   id           String    @id @default(cuid())
@@ -134,7 +100,7 @@ model SituationItem {
   description  String?
   assignedToId String?
   dueDate      DateTime?
-  status       ItemStatus @default(PENDING)
+  status       String     @default("PENDING")
   displayOrder Int        @default(0)
   createdAt    DateTime   @default(now())
   completedAt  DateTime?
@@ -143,16 +109,12 @@ model SituationItem {
   assignedTo User?            @relation(fields: [assignedToId], references: [id])
 }
 
-enum MemoryContextType {
-  HOUSEHOLD_PREFERENCES
-  CHORE_PATTERNS
-  SITUATION_HISTORY
-}
+
 
 // Condensed context for Claude. Updated periodically to stay within token limits.
 model LlmMemory {
   id          String            @id @default(cuid())
-  contextType MemoryContextType @unique
+  contextType String            @unique
   summary     String            // What Claude receives as context
   rawData     Json?             // Supporting data for re-summarization
   createdAt   DateTime          @default(now())
