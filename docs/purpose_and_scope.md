@@ -29,7 +29,8 @@ The app should:
 - Manual assignment of chores.
 - Recurring frequency support for practical household use.
 - Mark done / skipped with timestamps.
-- Priority labels.
+- Priority guidance with finite urgency budgeting and ranked sequencing ("do this first, then this").
+- Backlog safety valve: busy-day flag with recommended focus block when high-urgency tasks pile up.
 - Special situations: free-text input -> generated checklist -> user can edit and save.
 - Lightweight gamification: points and streaks.
 - Installable web app (Add to Home Screen).

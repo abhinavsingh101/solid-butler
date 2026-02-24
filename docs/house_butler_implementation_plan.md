@@ -21,9 +21,12 @@ MVP includes:
 - 2-user password login.
 - Chore catalog management (add/edit/archive).
 - Manual assignment to a household member.
+- One-step quick assignment for ad-hoc tasks between members.
 - Recurring due logic for chores.
 - Mark done / skipped, with timestamps and notes.
-- Priority labels (`high`, `medium`, `low`).
+- Priority labels (`high`, `medium`, `low`) with finite urgency-point budgeting.
+- Ranked "if you have 10 minutes, do this first" priority sequence with cumulative time.
+- Busy-day safety valve with 30/60 minute focus recommendation when urgent backlog clusters.
 - Special situations: free-text input -> generated checklist -> editable and saveable.
 - Lightweight gamification: points + streaks.
 - Installable web app (Add to Home Screen).
@@ -97,6 +100,19 @@ Execution approach:
 - Run a scheduler job (or cron-triggered endpoint) that creates pending assignments when due.
 - Scheduler must be idempotent (safe to run multiple times).
 - If multiple periods were missed, generate only one current pending assignment by default (simple backlog behavior for MVP).
+
+## 6.1) Priority and Urgency Model (MVP)
+
+Mental model:
+- User time is finite, so urgency must be finite too.
+- The system should produce a practical sequence, not a flat "many urgent tasks" list.
+
+Implementation rules:
+- Compute per-task raw urgency from due status + overdue growth.
+- Distribute a fixed shared urgency budget across current pending tasks based on raw urgency weights.
+- Sort by allocated urgency points (then due date), and assign rank numbers.
+- Return cumulative estimated minutes so users can continue the list in 10-minute blocks.
+- Detect upcoming busy days (multiple high-urgency tasks due together) and recommend a 30- or 60-minute focus block.
 
 ## 7) LLM and Memory Architecture (MVP)
 
@@ -182,6 +198,9 @@ Rules:
 - Assignment and status update flow.
 - Recurrence + due-generation scheduler.
 - Dashboard for today/overdue chores.
+- Quick ad-hoc assignment from dashboard.
+- Finite urgency ranking and cumulative-minute priority sequencing.
+- Busy-day safety valve detection and focus-block recommendation.
 
 ### Slice 3: Special situations and memory
 - Situation creation and checklist persistence.
