@@ -194,6 +194,9 @@ Rules:
     - assignment completion gamification update + summary retrieval
     - scheduler idempotency for recurring chores
     - dashboard assignment payload shape (priority plan + busy days)
+  - Playwright MVP smoke coverage added:
+    - invalid login error path
+    - login -> quick assign -> complete -> gamification summary update
   - CI gate added to run Postgres-backed test suite and production build on pull requests and `main`.
 
 ### Manual checks (release checklist)
