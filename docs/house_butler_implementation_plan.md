@@ -194,6 +194,7 @@ Rules:
     - assignment completion gamification update + summary retrieval
     - scheduler idempotency for recurring chores
     - dashboard assignment payload shape (priority plan + busy days)
+  - CI gate added to run Postgres-backed test suite and production build on pull requests and `main`.
 
 ### Manual checks (release checklist)
 - Add to Home Screen works on iOS and Android.
