@@ -15,6 +15,10 @@ type Chore = {
   description: string | null
   category: 'CLEANING' | 'COOKING' | 'LAUNDRY' | 'MAINTENANCE' | 'SHOPPING' | 'OTHER'
   priority: 'HIGH' | 'MEDIUM' | 'LOW'
+  estimatedMinutes: number
+  baseUrgencyPoints: number
+  urgencyGrowthPerDay: number
+  urgencyMaxPoints: number
   frequencyType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'AS_NEEDED'
   frequencyValue: number
   isActive: boolean
@@ -32,6 +36,10 @@ type FormState = {
   priority: Chore['priority']
   frequencyType: Chore['frequencyType']
   frequencyValue: number
+  estimatedMinutes: number
+  baseUrgencyPoints: number
+  urgencyGrowthPerDay: number
+  urgencyMaxPoints: number
   defaultAssigneeId: string
   nextDueAt: string
 }
@@ -43,6 +51,10 @@ const defaultFormState: FormState = {
   priority: 'MEDIUM',
   frequencyType: 'WEEKLY',
   frequencyValue: 1,
+  estimatedMinutes: 10,
+  baseUrgencyPoints: 5,
+  urgencyGrowthPerDay: 1,
+  urgencyMaxPoints: 10,
   defaultAssigneeId: '',
   nextDueAt: '',
 }
@@ -105,6 +117,10 @@ export function ChoresClient() {
       priority: form.priority,
       frequencyType: form.frequencyType,
       frequencyValue: Number(form.frequencyValue),
+      estimatedMinutes: Number(form.estimatedMinutes),
+      baseUrgencyPoints: Number(form.baseUrgencyPoints),
+      urgencyGrowthPerDay: Number(form.urgencyGrowthPerDay),
+      urgencyMaxPoints: Number(form.urgencyMaxPoints),
       defaultAssigneeId: form.defaultAssigneeId || null,
       nextDueAt: form.nextDueAt ? new Date(form.nextDueAt).toISOString() : null,
     }
@@ -140,6 +156,10 @@ export function ChoresClient() {
       priority: chore.priority,
       frequencyType: chore.frequencyType,
       frequencyValue: chore.frequencyValue,
+      estimatedMinutes: chore.estimatedMinutes,
+      baseUrgencyPoints: chore.baseUrgencyPoints,
+      urgencyGrowthPerDay: chore.urgencyGrowthPerDay,
+      urgencyMaxPoints: chore.urgencyMaxPoints,
       defaultAssigneeId: chore.defaultAssignee?.id || '',
       nextDueAt: chore.nextDueAt ? new Date(chore.nextDueAt).toISOString().slice(0, 16) : '',
     })
@@ -234,6 +254,44 @@ export function ChoresClient() {
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="number"
+              min={1}
+              value={form.estimatedMinutes}
+              onChange={(e) => setForm((prev) => ({ ...prev, estimatedMinutes: Number(e.target.value) || 10 }))}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              placeholder="Estimated minutes"
+            />
+            <input
+              type="number"
+              min={1}
+              value={form.baseUrgencyPoints}
+              onChange={(e) => setForm((prev) => ({ ...prev, baseUrgencyPoints: Number(e.target.value) || 1 }))}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              placeholder="Base urgency"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="number"
+              min={0}
+              value={form.urgencyGrowthPerDay}
+              onChange={(e) => setForm((prev) => ({ ...prev, urgencyGrowthPerDay: Number(e.target.value) || 0 }))}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              placeholder="Urgency growth/day"
+            />
+            <input
+              type="number"
+              min={1}
+              value={form.urgencyMaxPoints}
+              onChange={(e) => setForm((prev) => ({ ...prev, urgencyMaxPoints: Number(e.target.value) || 1 }))}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+              placeholder="Urgency max"
+            />
+          </div>
+
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <select
               value={form.defaultAssigneeId}
@@ -294,6 +352,9 @@ export function ChoresClient() {
                   <h3 className="text-base font-semibold text-zinc-100">{chore.name}</h3>
                   <p className="mt-1 text-xs text-zinc-400">
                     {chore.category} • {chore.priority} • {chore.frequencyType} ({chore.frequencyValue})
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Duration: ~{chore.estimatedMinutes} min • Urgency {chore.baseUrgencyPoints}+{chore.urgencyGrowthPerDay}/day up to {chore.urgencyMaxPoints}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">
                     Assignee: {chore.defaultAssignee?.displayName || 'Unassigned'} • Next due:{' '}

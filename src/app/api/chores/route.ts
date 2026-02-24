@@ -3,12 +3,17 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { normalizeFrequencyValue } from '@/lib/recurrence'
+import { sanitizePositiveInt, urgencyDefaultsForPriority } from '@/lib/urgency'
 
 const createChoreSchema = z.object({
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(500).optional().nullable(),
   category: z.nativeEnum(ChoreCategory),
   priority: z.nativeEnum(Priority),
+  estimatedMinutes: z.number().int().min(1).max(240).optional(),
+  baseUrgencyPoints: z.number().int().min(1).max(100).optional(),
+  urgencyGrowthPerDay: z.number().int().min(0).max(100).optional(),
+  urgencyMaxPoints: z.number().int().min(1).max(100).optional(),
   frequencyType: z.nativeEnum(FrequencyType),
   frequencyValue: z.number().int().min(1).max(365),
   defaultAssigneeId: z.string().cuid().optional().nullable(),
@@ -41,6 +46,11 @@ export async function POST(request: Request) {
 
     const data = parsed.data
     const normalizedFrequency = normalizeFrequencyValue(data.frequencyValue)
+    const defaults = urgencyDefaultsForPriority(data.priority)
+    const estimatedMinutes = sanitizePositiveInt(data.estimatedMinutes ?? defaults.estimatedMinutes, defaults.estimatedMinutes)
+    const baseUrgencyPoints = sanitizePositiveInt(data.baseUrgencyPoints ?? defaults.baseUrgencyPoints, defaults.baseUrgencyPoints)
+    const urgencyGrowthPerDay = Math.max(0, Math.floor(data.urgencyGrowthPerDay ?? defaults.urgencyGrowthPerDay))
+    const urgencyMaxPoints = Math.max(baseUrgencyPoints, sanitizePositiveInt(data.urgencyMaxPoints ?? defaults.urgencyMaxPoints, defaults.urgencyMaxPoints))
     const nextDueAt =
       data.frequencyType === FrequencyType.AS_NEEDED
         ? null
@@ -54,6 +64,10 @@ export async function POST(request: Request) {
         description: data.description ?? null,
         category: data.category,
         priority: data.priority,
+        estimatedMinutes,
+        baseUrgencyPoints,
+        urgencyGrowthPerDay,
+        urgencyMaxPoints,
         frequencyType: data.frequencyType,
         frequencyValue: normalizedFrequency,
         defaultAssigneeId: data.defaultAssigneeId ?? null,

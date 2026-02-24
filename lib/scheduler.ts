@@ -1,6 +1,7 @@
 import { AssignmentEventType, AssignmentStatus, ChoreHistoryAction, FrequencyType, SourceChannel } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { computeNextDueAfter } from '@/lib/recurrence'
+import { sanitizePositiveInt } from '@/lib/urgency'
 
 type SchedulerResult = {
   scanned: number
@@ -106,7 +107,7 @@ export async function generateDueAssignments(now: Date = new Date()): Promise<Sc
         currentDue: dueDate,
         now,
         frequencyType: chore.frequencyType,
-        frequencyValue: chore.frequencyValue,
+        frequencyValue: sanitizePositiveInt(chore.frequencyValue, 1),
       })
 
       await tx.chore.update({

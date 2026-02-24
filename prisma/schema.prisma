@@ -126,6 +126,10 @@ model Chore {
   description    String?
   category       ChoreCategory @default(OTHER)
   priority       Priority      @default(MEDIUM)
+  estimatedMinutes Int         @default(10)
+  baseUrgencyPoints Int        @default(5)
+  urgencyGrowthPerDay Int      @default(1)
+  urgencyMaxPoints Int         @default(10)
   frequencyType  FrequencyType @default(WEEKLY)
   frequencyValue Int           @default(1)
   isActive       Boolean       @default(true)

@@ -11,17 +11,38 @@ type Assignment = {
     id: string
     name: string
     priority: 'HIGH' | 'MEDIUM' | 'LOW'
+    estimatedMinutes: number
   }
   assignedTo: {
     id: string
     displayName: string
     username: string
   }
+  urgencyPoints: number
+  urgencyBudgetTotal: number
+  priorityRank: number
 }
 
 type DashboardPayload = {
   overdue: Assignment[]
   today: Assignment[]
+  priorityPlan: Array<{
+    assignmentId: string
+    taskName: string
+    priorityRank: number
+    urgencyPoints: number
+    urgencyBudgetTotal: number
+    estimatedMinutes: number
+    cumulativeMinutes: number
+  }>
+  busyDays: Array<{
+    date: string
+    highUrgencyCount: number
+    totalTasks: number
+    totalEstimatedMinutes: number
+    reason: string
+    recommendedFocusMinutes: 30 | 60
+  }>
 }
 
 const priorityClass: Record<string, string> = {
@@ -33,6 +54,14 @@ const priorityClass: Record<string, string> = {
 export function DashboardClient() {
   const [overdue, setOverdue] = useState<Assignment[]>([])
   const [today, setToday] = useState<Assignment[]>([])
+  const [priorityPlan, setPriorityPlan] = useState<DashboardPayload['priorityPlan']>([])
+  const [busyDays, setBusyDays] = useState<DashboardPayload['busyDays']>([])
+  const [users, setUsers] = useState<Array<{ id: string; displayName: string; username: string }>>([])
+  const [quickTitle, setQuickTitle] = useState('')
+  const [quickAssigneeId, setQuickAssigneeId] = useState('')
+  const [quickNotes, setQuickNotes] = useState('')
+  const [quickDueDate, setQuickDueDate] = useState('')
+  const [quickLoading, setQuickLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [actionError, setActionError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -45,13 +74,54 @@ export function DashboardClient() {
     setActionError('')
 
     try {
-      const data = await fetchJson<DashboardPayload>('/api/assignments?view=dashboard')
+      const [data, usersData] = await Promise.all([
+        fetchJson<DashboardPayload>('/api/assignments?view=dashboard'),
+        fetchJson<{ users: Array<{ id: string; displayName: string; username: string }> }>('/api/users'),
+      ])
       setOverdue(data.overdue)
       setToday(data.today)
+      setPriorityPlan(data.priorityPlan)
+      setBusyDays(data.busyDays)
+      setUsers(usersData.users)
+      if (!quickAssigneeId && usersData.users[0]) {
+        setQuickAssigneeId(usersData.users[0].id)
+      }
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Failed to load dashboard')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function createQuickAssignment(e: React.FormEvent) {
+    e.preventDefault()
+    if (!quickTitle.trim() || !quickAssigneeId) {
+      setActionError('Enter a task and select an assignee.')
+      return
+    }
+
+    setQuickLoading(true)
+    setActionError('')
+
+    try {
+      await fetchJson('/api/assignments/quick', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: quickTitle,
+          assignedToId: quickAssigneeId,
+          dueDate: quickDueDate ? new Date(quickDueDate).toISOString() : null,
+          notes: quickNotes || null,
+        }),
+      })
+
+      setQuickTitle('')
+      setQuickNotes('')
+      setQuickDueDate('')
+      await loadDashboard()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to create quick assignment')
+    } finally {
+      setQuickLoading(false)
     }
   }
 
@@ -106,6 +176,87 @@ export function DashboardClient() {
           {schedulerLoading ? 'Refreshing...' : 'Generate Due Chores'}
         </button>
       </div>
+
+      {priorityPlan.length > 0 && (
+        <section className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-300">Priority Sequence</h2>
+          <p className="mt-1 text-xs text-zinc-400">If you have only 10 minutes, start with rank #1. Then continue in order.</p>
+          <div className="mt-3 space-y-2">
+            {priorityPlan.slice(0, 5).map((item) => (
+              <div key={item.assignmentId} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2">
+                <div>
+                  <p className="text-sm font-semibold text-zinc-100">#{item.priorityRank} {item.taskName}</p>
+                  <p className="text-xs text-zinc-400">
+                    Urgency {item.urgencyPoints}/{item.urgencyBudgetTotal} pool • ~{item.estimatedMinutes} min • cumulative {item.cumulativeMinutes} min
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {busyDays.length > 0 && (
+        <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-200">Busy Days</h2>
+          <p className="mt-1 text-xs text-amber-100/80">The assistant can treat these dates as overloaded when planning your day.</p>
+          <div className="mt-3 space-y-2">
+            {busyDays.map((day) => (
+              <div key={day.date} className="rounded-lg border border-amber-400/20 bg-zinc-950/40 px-3 py-2">
+                <p className="text-sm font-semibold text-amber-100">{new Date(day.date).toLocaleDateString()}</p>
+                <p className="text-xs text-amber-100/80">
+                  {day.reason} • {day.totalTasks} total tasks • ~{day.totalEstimatedMinutes} minutes • focus block: {day.recommendedFocusMinutes} min
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-300">Quick Assign</h2>
+        <p className="mt-1 text-xs text-zinc-400">Create and assign a task in one step (for example, folded clothes to put away).</p>
+
+        <form className="mt-3 space-y-2" onSubmit={createQuickAssignment}>
+          <input
+            value={quickTitle}
+            onChange={(e) => setQuickTitle(e.target.value)}
+            placeholder="Task title"
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+          />
+          <select
+            value={quickAssigneeId}
+            onChange={(e) => setQuickAssigneeId(e.target.value)}
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+          >
+            <option value="">Assign to...</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.displayName}
+              </option>
+            ))}
+          </select>
+          <input
+            type="datetime-local"
+            value={quickDueDate}
+            onChange={(e) => setQuickDueDate(e.target.value)}
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+          />
+          <input
+            value={quickNotes}
+            onChange={(e) => setQuickNotes(e.target.value)}
+            placeholder="Notes (optional)"
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
+          />
+          <button
+            type="submit"
+            disabled={quickLoading}
+            className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+          >
+            {quickLoading ? 'Assigning...' : 'Create and Assign'}
+          </button>
+        </form>
+      </section>
 
       {actionError && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{actionError}</div>}
 
@@ -169,6 +320,9 @@ function AssignmentCard({ assignment, busy, onComplete, onSkip }: AssignmentCard
           <h3 className="text-base font-semibold text-zinc-100">{assignment.chore.name}</h3>
           <p className="mt-1 text-sm text-zinc-400">Assigned to {assignment.assignedTo.displayName}</p>
           <p className="mt-1 text-xs uppercase tracking-wide text-zinc-500">Priority: {assignment.chore.priority}</p>
+          <p className="mt-1 text-xs text-zinc-300">
+            Urgency: {assignment.urgencyPoints}/{assignment.urgencyBudgetTotal} pool • Rank #{assignment.priorityRank}
+          </p>
         </div>
         <time className="text-xs text-zinc-400">{new Date(assignment.dueDate).toLocaleString()}</time>
       </div>
