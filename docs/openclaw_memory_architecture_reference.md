@@ -8,192 +8,198 @@ In practice, OpenClaw separates:
 - short-lived model context (can be pruned/compacted), and
 - durable workspace memory files (source of truth).
 
-This document summarizes the architecture in a readable, implementation-focused way.
+This document reflects primary source documentation as of 2026-02-24.
 
 ## Scope and Confidence
-- Retrieval date: 2026-02-24.
-- Primary sources: official OpenClaw docs and OpenClaw research pages.
-- Stability labels used in this doc:
-  - `Stable`: documented platform behavior.
-  - `Experimental`: documented but explicitly marked experimental.
-  - `Research`: design direction from research notes, not guaranteed product behavior.
+- Last reviewed: 2026-02-24 from primary sources (docs.openclaw.ai).
+- Sections marked `[Research]` come from the v2 research notes page, not stable product docs.
 
-## 1) Core Mental Model (`Stable`)
-OpenClaw memory is file-first.
+---
 
-Meaning:
+## 1) Core Mental Model
+OpenClaw memory is **file-first**.
+
 - Durable memory lives in Markdown files in the workspace.
 - In-session context helps the model reason now, but is not long-term truth.
 - Compaction and pruning optimize context window use; they do not replace durable memory writing.
 
-Why this matters:
-- Long sessions are safe only when important facts are persisted to disk.
+---
 
-## 2) Default Memory Layers (`Stable`)
-OpenClaw defines two default memory layers.
+## 2) Default Memory Files
 
-### Layer A: Daily log
+### Daily log
 - Path: `memory/YYYY-MM-DD.md`
-- Usage: day-level notes and running context.
-- Pattern: append-oriented.
+- Append-only. Loaded for today + yesterday at session start.
 
-### Layer B: Durable curated memory
-- Path: `MEMORY.md` (optional)
-- Usage: stable preferences, decisions, durable facts.
-- Scope rule: loaded for private/main contexts, not shared group contexts.
+### Curated durable memory
+- Path: `MEMORY.md` (optional, user-maintained)
+- Stable preferences, decisions, durable facts.
+- Only loaded in the main/private session context — never in group/shared contexts.
 
-Design implication:
-- Keep high-churn notes and durable knowledge separate.
+**Design implication:** Keep high-churn notes and durable knowledge separate.
 
-## 3) Workspace and Trust Boundary (`Stable`)
-OpenClaw separates workspace content from platform internals.
+---
 
-Typical split:
-- Workspace: agent files, memory markdown, project docs.
-- `~/.openclaw/`: config, credentials, transcripts, managed runtime artifacts.
+## 3) Memory Tools
+Two tools are exposed to the agent:
 
-Security implication:
-- Filesystem access is the practical trust boundary.
-- Durability and privacy depend on OS-level controls.
+- `memory_search` — semantic search over Markdown chunks from `MEMORY.md` + `memory/**/*.md`. Returns snippet text (capped ~700 chars), file path, line range, score, provider/model. Does NOT return full files.
+- `memory_get` — targeted read of a specific memory Markdown file, optionally from a line range. Paths outside `MEMORY.md` / `memory/` are rejected.
 
-## 4) Compaction and Pre-Compaction Memory Flush (`Stable`)
-OpenClaw supports a pre-compaction memory flush pattern.
+Both tools are only active when `memorySearch.enabled` resolves true.
 
-What happens:
-1. Session token usage approaches a soft threshold.
-2. OpenClaw can run a silent turn to encourage writing durable notes.
-3. The turn is suppressed from user output via `NO_REPLY` behavior.
-4. Flush runs once per compaction cycle and only when workspace is writable.
+---
 
-Why this exists:
-- Prevents losing important context when compaction runs.
+## 4) Retrieval Pipeline (Full Detail)
 
-Important nuance:
-- Compaction summarizes session context.
-- Pruning trims old tool-output clutter in memory context.
-- Neither is a substitute for durable writes.
+OpenClaw does not use simple vector search. The actual pipeline is:
 
-## 5) Memory Plugin Slot and Tools (`Stable`)
-Memory behavior is plugin-driven (`memory-core` by default).
+```
+Vector + BM25 → Weighted Merge → Temporal Decay → Sort → MMR → Top-K
+```
 
-Key tools:
-- `memory_search`
-  - semantic retrieval over indexed memory chunks
-  - returns snippets + metadata (path/line range/score), not full files
-- `memory_get`
-  - targeted read of allowed memory files/lines
+### Step 1: Candidate generation
+- **Vector (semantic):** top `maxResults × candidateMultiplier` results by cosine similarity.
+- **BM25 (lexical):** top `maxResults × candidateMultiplier` by FTS5 BM25 rank.
 
-Design value:
-- Reduces accidental context overload.
-- Keeps retrieval auditable and bounded.
+### Step 2: Weighted merge
+```
+finalScore = vectorWeight × vectorScore + textWeight × textScore
+```
+- Default: `vectorWeight=0.7`, `textWeight=0.3` (normalized to 1.0).
+- If embeddings are unavailable, BM25-only results are still returned (no hard failure).
+- If FTS5 creation fails, falls back to vector-only.
 
-## 6) Indexing Pipeline (`Stable`)
-OpenClaw uses a derived index over memory sources.
+### Step 3: Temporal decay (recency boost)
+```
+decayedScore = score × e^(-λ × ageInDays)
+where λ = ln(2) / halfLifeDays
+```
+- Default `halfLifeDays=30`: score halves every 30 days.
+- Today: 100% of score. 7 days ago: ~84%. 30 days ago: 50%. 90 days ago: ~12.5%.
+- **Exempt from decay:** `MEMORY.md` and non-dated files in `memory/` (e.g., `memory/network.md`) — these are durable reference files that should always rank normally.
 
-Documented characteristics:
-- Markdown chunking (token-targeted with overlap).
-- Per-agent SQLite index store.
-- Watchers mark index dirty on file updates (debounced).
-- Sync can run on session start, search trigger, and schedule.
-- Sync is asynchronous; search can briefly be stale during background updates.
+### Step 4: MMR re-ranking (diversity)
+```
+λ × relevance − (1−λ) × max_similarity_to_selected
+```
+- Default `lambda=0.7` (slight relevance bias, some diversity).
+- MMR prevents near-duplicate chunks from filling the result set.
 
-Reindex behavior:
-- Embedding/index parameter changes can trigger full reindex.
-- Index is rebuildable derived state; source files remain canonical.
+### Step 5: Top-K output
+- Snippet-only, with provenance (file path, line range, score).
 
-## 7) Hybrid Retrieval (`Stable` + `Research`)
-OpenClaw docs describe hybrid retrieval direction:
-- semantic/vector retrieval for meaning-level matches
-- lexical/BM25/FTS retrieval for exact token matches
+### Why hybrid matters
+- Semantic catches paraphrases ("cleaned the kitchen" vs "wiped down counters").
+- Lexical catches exact terms — names, IDs, chore titles.
 
-Why hybrid matters:
-- semantic catches paraphrases
-- lexical catches exact terms (IDs, env vars, symbols)
+---
 
-Research-level ranking concepts (use cautiously):
-- weighted merge of vector + lexical scores
-- candidate expansion before rerank
-- optional recency decay
-- optional diversity rerank (MMR-like)
+## 5) Indexing Pipeline
 
-## 8) Session Transcript Memory (`Experimental`)
-OpenClaw can optionally include session transcripts in retrieval.
+- **Chunks:** Markdown chunked at ~400 token target with 80-token overlap.
+- **Index store:** Per-agent SQLite at `~/.openclaw/memory/<agentId>.sqlite`.
+- **Freshness:** File watcher on `MEMORY.md` + `memory/` marks index dirty (1.5s debounce). Sync runs on session start, on search, or on interval — asynchronously.
+- **Stale risk:** Search can briefly return slightly stale results during background sync.
+- **Reindex triggers:** If embedding provider/model, endpoint fingerprint, or chunking params change, the entire index is reset and rebuilt.
 
-Documented behavior:
-- opt-in feature
-- async indexing with debounce and thresholds
-- best-effort freshness (retrieval never blocks on indexing)
-- isolation per agent
+---
 
-Operational caution:
-- transcript files exist on disk; apply strict filesystem controls.
+## 6) Automatic Memory Flush (Pre-Compaction)
 
-## 9) Retain / Recall / Reflect Pattern (`Research`)
-OpenClaw research pages describe a useful memory lifecycle:
+Before a session's context window approaches compaction, OpenClaw can trigger a silent turn to encourage the model to write durable notes:
 
-### Retain
-Write self-contained facts/events durably.
+```
+Soft threshold: contextWindow - reserveTokensFloor - softThresholdTokens
+```
 
-### Recall
-Retrieve relevant evidence with ranking.
+- Flush is silent (`NO_REPLY` — not shown to user).
+- Runs once per compaction cycle, tracked in `sessions.json` via `memoryFlushAt`.
+- Skipped if workspace is read-only (`workspaceAccess: "ro"` or `"none"`).
 
-### Reflect
-Consolidate raw events into higher-quality durable summaries.
+**Important:** This is relevant for OpenClaw's chat-agent model, not for stateless API routes. Butler's request-response architecture has no session to compact.
 
-Why this pattern is valuable:
-- It keeps long-term memory useful instead of becoming a noisy log dump.
+---
 
-## 10) Concrete Flow Example
-Example: user says, "Remember I prefer chores in the evening."
+## 7) Compaction vs Pruning (Distinct Operations)
 
-Recommended OpenClaw-aligned behavior:
-1. Record note in daily log.
-2. If preference looks durable, copy/merge into curated memory.
-3. Index update marks dirty and syncs asynchronously.
-4. Future `memory_search` retrieves concise relevant snippet with source metadata.
+These are separate mechanisms — often confused:
 
-## 11) Design Strengths and Risks
+- **Compaction:** Summarises the session conversation and persists it to the JSONL transcript. The model context for future turns becomes: [compaction summary] + [recent messages after the compaction point]. Run manually via `/compact` or automatically when token threshold is crossed.
+- **Session pruning:** Trims old `toolResult` messages in-memory, per request, before sending to the model. Does not modify the JSONL transcript. Only prunes tool results (never user/assistant messages). Primarily a cost optimization for Anthropic prompt caching.
 
-### Strengths
-- Durable-file source of truth.
-- Bounded retrieval tools.
-- Rebuildable index model.
-- Works with long-running sessions through compaction + flush.
+---
 
-### Risks
-- Overwriting curated memory with noisy facts.
-- Reliance on async index freshness.
-- Potential privacy leakage if filesystem access is weak.
+## 8) Session Persistence
 
-## 12) Reusable Patterns for Other Apps
-Patterns worth carrying into application design:
-- append-only raw events + curated durable summaries
-- hybrid retrieval, not vector-only
-- explicit durability guardrails before context compaction
-- provenance-friendly snippets and evidence trails
-- periodic consolidation jobs
+Two layers:
 
-## 13) Implementation Checklist (When Adopting)
-Use this checklist when reusing OpenClaw memory ideas:
-1. Define raw event source-of-truth storage.
-2. Define curated summary storage and refresh cadence.
-3. Set retrieval contract (max snippets, time window, ranking policy).
-4. Add schema validation for model outputs.
-5. Add observability: retrieval hit rate, acceptance rate, stale index incidents.
-6. Add safety: path restrictions, read/write scopes, access controls.
+1. **Session store (`sessions.json`):** Key/value map of session metadata — current session ID, last activity, token counters, compaction count, model overrides. Small, mutable, safe to edit.
+2. **Transcripts (`<sessionId>.jsonl`):** Append-only, tree-structured (each entry has `id` + `parentId`). Contains user/assistant messages, tool calls, compaction summaries. Used to rebuild model context for future turns.
 
-## Glossary
-- `Durable memory`: persisted storage intended to survive sessions.
-- `Compaction`: compressing conversation context for token efficiency.
-- `Pruning`: trimming low-value tool-result context.
-- `Hybrid retrieval`: semantic + lexical retrieval combined.
-- `Curated memory`: stable distilled facts, not raw logs.
+**Session isolation (important for multi-user setups):**
+- Default: `dmScope: "main"` — all DMs share one session. Fine for single-user.
+- For multi-user: `dmScope: "per-channel-peer"` isolates each conversation partner's context. Without this, context bleeds between users.
+
+---
+
+## 9) Research: Memory v2 — Retain / Recall / Reflect (Research)
+
+From OpenClaw's v2 research notes (not yet stable product behavior, but the design direction):
+
+### The three-phase loop
+
+**Retain:** At end of day, add a `## Retain` section to the daily log with 2–5 self-contained, tagged facts:
+```
+## Retain
+- W @Entity: objective world fact
+- B @Entity: what the agent/user did (biographical)
+- O(c=0.9) @Entity: opinion/preference with confidence
+- S: observation or generated summary
+```
+
+**Recall:** Queries over the derived index support: lexical (FTS5), entity-based, temporal, opinion (with confidence + evidence), and kind-filtered queries.
+
+**Reflect:** A scheduled job that:
+- Updates entity pages in `bank/entities/` from recent facts.
+- Updates `bank/opinions.md` confidence based on new reinforcing or contradicting evidence.
+- Small confidence deltas for incremental evidence; large jumps require strong contradiction + repeated signals.
+
+### Confidence-bearing opinions
+Each opinion has: statement, confidence `c ∈ [0,1]`, `last_updated`, and evidence links (supporting + contradicting). This is the mechanism for "learns individual preferences" — preferences are opinions that strengthen or weaken based on observed behavior.
+
+This pattern is directly relevant to Butler's `MemorySummary.confidence` field, which currently has no defined update rule.
+
+---
+
+## 10) Reusable Patterns for Butler
+
+Patterns confirmed from primary sources that apply to an app context (not just a chat agent):
+
+1. **Durable-first writes**: any signal not written as an event row doesn't exist for learning purposes.
+2. **Append-only raw events + periodic curated summaries**: raw history is immutable; summaries are derived and refreshable.
+3. **Bounded retrieval**: return snippets with provenance, not full documents.
+4. **Temporal decay**: recent behavioral patterns should outweigh older ones.
+5. **Confidence-bearing opinions** with defined update rules: don't just store a confidence score — define when and how it moves.
+6. **Typed facts (W/B/O/S)**: distinguishing between objective facts, behavioral patterns, and preferences helps retrieval and avoids mixing durable truths with stale observations.
+
+## 11) What Does NOT Apply to Butler
+
+OpenClaw is a long-running conversational agent. Butler is a stateless web app. The following OpenClaw mechanisms are **not relevant** to Butler's architecture:
+
+- Pre-compaction memory flush (no persistent session context)
+- JSONL transcript management and session compaction
+- Session pruning for prompt cache optimization
+- `dmScope` session isolation (Butler uses JWT-authenticated HTTP sessions)
+- Wake-word / always-on session management
+
+---
 
 ## Sources (Primary)
 - [OpenClaw Memory](https://docs.openclaw.ai/concepts/memory)
 - [OpenClaw Agent Workspace](https://docs.openclaw.ai/concepts/agent-workspace)
 - [OpenClaw Session Management](https://docs.openclaw.ai/concepts/session)
 - [OpenClaw Compaction](https://docs.openclaw.ai/concepts/compaction)
+- [OpenClaw Session Pruning](https://docs.openclaw.ai/concepts/session-pruning)
 - [OpenClaw Session Management Deep Dive](https://docs.openclaw.ai/reference/session-management-compaction)
-- [OpenClaw CLI Memory](https://docs.openclaw.ai/cli/memory)
-- [OpenClaw Memory Research](https://docs.openclaw.ai/research/memory)
+- [OpenClaw Memory v2 Research](https://docs.openclaw.ai/research/memory)
